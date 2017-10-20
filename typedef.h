@@ -1,6 +1,8 @@
 #ifndef __TYPEDEF_H__
 #define __TYPEDEF_H__
 
+#define ULONG unsigned long 
+
 typedef struct
 {
     int a;
