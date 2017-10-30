@@ -3,6 +3,7 @@
 
 #define ULONG unsigned long 
 #define UCHAR unsigned char
+#define USHORT unsigned short
 
 typedef struct
 {
