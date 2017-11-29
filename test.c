@@ -32,7 +32,36 @@ int testcase2(void)
     return 0;
 }
 
+int testcase3(void)
+{
+    printf("sizeof pointer: %u\r\n", sizeof(char *));
+    return 0;
+}
+
+int testcase4(void)
+{
+    char *arg[] = {"ls", "-l", NULL};
+
+    if (fork() == 0)
+    {
+        execvp("ls", arg);
+    }
+
+    return 0;
+}
+
+#define TEST_STRING	"hello"
+#define TEST_STRING_1	"world"
+int testcase5(void)
+{
+    printf(TEST_STRING " zhangyinjun\r\n");
+    printf(TEST_STRING TEST_STRING_1"\r\n");
+    return 0;
+}
+
 int main(int argc, const char *argv[])
 {
-    return testcase2();
+    testcase5();
+
+    return 0;
 }
