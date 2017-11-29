@@ -61,7 +61,5 @@ int testcase5(void)
 
 int main(int argc, const char *argv[])
 {
-    testcase5();
-
-    return 0;
+    return testcase5();
 }
