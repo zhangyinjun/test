@@ -6,6 +6,8 @@
 /*     instead of traversing the list                           */
 /*  v3. define new struct(32bits) to store prio instead of node */
 /*     struct(64bits)                                           */
+/*  v4. use 15bits to store x_flag instead of 8bits which need  */
+/*     prefix expanding                                         */
 /****************************************************************/
 #include <stdlib.h>
 #include <stdio.h>
@@ -22,27 +24,23 @@ typedef struct fields
     u32 addr;
     u32 x_addr;
     u16 flag;
-    u8 x_flag;
-    u16 x_prio;
+    u16 x_flag;
 }fields_t;
 
 typedef struct node
 {
     struct node *next;
     fields_t data;
-    union
-    {
-        u32 vrf;    //for level 0, store vrf
-        u32 index;  //for other levels, store the node's id
-    } u;
-}node_t;
+    u32 index;
+    u64 reserve;
+}node_t;//size=32byte(64bit sys), assume need 64bits in hw
 
 typedef struct prio
 {
     struct prio *next;
     u32 data;
     u32 index;
-}prio_t;
+}prio_t;//size=16byte(64bit sys), assume need 32bits in hw
 
 typedef struct rule
 {
@@ -61,7 +59,7 @@ typedef enum
     etype_max
 }ruletype_e;
 
-#define MAX_RULE_NUM    4*1024*1024
+#define MAX_RULE_NUM    8*1024*1024
 #define MAX_LEVEL       32
 #define BITS_PER_BYTE   8
 
@@ -82,7 +80,7 @@ u32 prio_id = 0;
 #define FREE_NODE(p)    free((p))
 #else
 char *base = NULL;
-#define SPACE   128*1024*1024
+#define SPACE   128*1024*1024//that is 256Mb for hw
 #define ALLOC_NODE(p, i)   \
     do {    \
         if ((node_id * sizeof(node_t) + prio_id * sizeof(prio_t)) >= SPACE)   \
@@ -91,7 +89,7 @@ char *base = NULL;
             goto done;  \
         }   \
         (p) = (node_t *)(base + node_id * sizeof(node_t));    \
-        (p)->u.index = node_id++;  \
+        (p)->index = node_id++;  \
     } while(0)
 
 #define ALLOC_PRIO(p, i)    \
@@ -199,7 +197,7 @@ void allocate(u32 num, ruletype_e type)
                     ALLOC_NODE(t, i);
                     if (!j)
                     {
-                        p->data.addr = t->u.index;
+                        p->data.addr = t->index;
                         t->next = n;
                     }
                     else
@@ -229,54 +227,48 @@ void allocate(u32 num, ruletype_e type)
             u8 xData = (rule_a[i].data[stepNum>>3] >> ((stepNum & 0x7) << 2)) & 0xf;
             u8 mask = (0xf << bitRemain) & 0xf;
             u8 j;
-            u8 new_flag = 0, new_prio = bitRemain;
-            prio_t *n = NULL;
-            prio_t *t = NULL, *o = NULL;
-            u32 prioAddr = 0;
+            prio_t *t = NULL, *n = NULL;
+            u8 bit = 0;
 
             if (p->data.x_flag)
                 n = (prio_t *)(base + SPACE - p->data.x_addr * sizeof(prio_t));
 
-            o = n;
-
-            for (j=0; j<BITS_PER_BYTE; j++)
+            for (j=0; j<4; j++)
             {
-                if (((j ^ xData) & ~mask) == 0)
-                    new_flag |= 1<<j;
-            }
-
-            for (j=0; j<BITS_PER_BYTE; j++)
-            {
-                if (p->data.x_flag & (1<<j))
+                if ((mask>>j)&0x1)
                 {
-                    if (!prioAddr)
-                        prioAddr = p->data.x_addr;
+                    bit = ((1<<j) - 1) + (xData & ~mask);
+                    break;
+                }
+            }
+            j = countBits(p->data.x_flag, bit);
+
+            if (!(p->data.x_flag & (1<<bit)))
+            {
+                ALLOC_PRIO(t, i);
+                if (!j)
+                {
+                    p->data.x_addr = t->index;
+                    t->next = n;
+                }
+                else
+                {
+                    j--;
+                    while (j--)
+                        n = n->next;
                     
-                    if ((new_flag & (1<<j)) && (((p->data.x_prio >> (j<<1)) & 0x3) < new_prio))
-                    {
-                        n->data = rule_a[i].prio;
-                        p->data.x_prio &= ~(0x3 << (j<<1));
-                        p->data.x_prio |= new_prio << (j<<1);
-                    }
-                    o = n;
-                    n = n->next;
+                    t->next = n->next;
+                    n->next = t;
                 }
-                else if (new_flag & (1<<j))
-                {
-                    ALLOC_PRIO(t, i);
-                    if (!prioAddr)
-                        prioAddr = t->index;
-                    else
-                        o->next = t;
-
-                    t->data = rule_a[i].prio;
-                    t->next = n;                    
-                    p->data.x_prio |= new_prio << (j<<1);
-                    o = t;
-                }
+                n = t;
+                p->data.x_flag |= 1<<bit;
             }
-            p->data.x_addr = prioAddr;
-            p->data.x_flag |= new_flag;
+            else
+            {
+                while (j--)
+                    n = n->next;
+            }
+            n->data = rule_a[i].prio;
         }
     }
     
@@ -398,7 +390,7 @@ void search(ruletype_e type)
         u8 len[etype_max] = {32, 48, 128, 144};
         char buf[512] = {0};
         char *temp = buf;
-        int i, j;
+        int i, j, k;
         u16 searchVrf = 0;
         u8 data = 0;
         u8 match = 0;
@@ -438,18 +430,23 @@ void search(ruletype_e type)
             {
                 if (n)
                 {
-                    if ((1<<(data&0x7)) & (n->data.x_flag))
+                    for (k=3; k>=0; k--)
                     {
+                        u8 bit = (data & ((1<<k) - 1)) + ((1<<k) - 1);
                         prio_t *p = NULL;
-                        
-                        j = countBits(n->data.x_flag, data & 0x7);
-                        p = (prio_t *)(base + SPACE - n->data.x_addr * sizeof(prio_t));
 
-                        while (j--)
-                            p = p->next;
+                        if ((1<<bit) & (n->data.x_flag))
+                        {
+                            j = countBits(n->data.x_flag, bit);
+                            p = (prio_t *)(base + SPACE - n->data.x_addr * sizeof(prio_t));
 
-                        prio = p->data;
-                        match = 1;
+                            while (j--)
+                                p = p->next;
+
+                            prio = p->data;
+                            match = 1;
+                            break;
+                        }
                     }
                     
                     if ((1<<data) & (n->data.flag))
