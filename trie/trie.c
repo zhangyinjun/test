@@ -8,6 +8,7 @@
 /*     struct(64bits)                                           */
 /*  v4. use 15bits to store x_flag instead of 8bits which need  */
 /*     prefix expanding                                         */
+/*  v5. support graphing the trie by using "-g" para            */
 /****************************************************************/
 #include <stdlib.h>
 #include <stdio.h>
@@ -65,6 +66,7 @@ typedef enum
 
 u32 node_id = 0;
 u32 prio_id = 0;
+u32 id = 0;
 #if 0
 #define ALLOC_NODE(p)                                   \
     do {                                                \
@@ -181,6 +183,7 @@ void allocate(u32 num, ruletype_e type)
                     while (j--)
                         n = n->next;
                 }
+                p->reserve = 1;//indicate the last level;
                 n->data = rule_a[i].prio;
             }
             else
@@ -274,6 +277,80 @@ void allocate(u32 num, ruletype_e type)
     
 done:
     return;
+}
+
+void genGraphNode(FILE *pf, node_t *r)
+{
+    int j;
+    u32 root = id;
+
+    if (r->reserve == 1)
+    {
+        prio_t *n = (prio_t *)(base + SPACE - r->data.addr * sizeof(prio_t));
+
+        for (j=0; j<countBits(r->data.flag, 16); j++)
+        {
+            id++;
+            fprintf(pf, "\tnode%u[label=\"%x\"];\n", id, n->data);
+            fprintf(pf, "\tnode%u:e->node%u;\n", root, id);
+            n = n->next;
+        }
+    }
+    else
+    {
+        node_t *n = (node_t *)(base + r->data.addr * sizeof(node_t));
+
+        for (j=0; j<countBits(r->data.flag, 16); j++)
+        {
+            id++;
+            fprintf(pf, "\tnode%u[label=\"<e>%x|<x>%x\"];\n", id, n->data.flag, n->data.x_flag);
+            fprintf(pf, "\tnode%u:e->node%u;\n", root, id);
+            genGraphNode(pf, n);
+            n = n->next;
+        }
+    }
+
+    {
+        prio_t *n = (prio_t *)(base + SPACE - r->data.x_addr * sizeof(prio_t));
+        
+        for (j=0; j<countBits(r->data.x_flag, 15); j++)
+        {
+            id++;
+            fprintf(pf, "\tnode%u[label=\"%x\"];\n", id, n->data);
+            fprintf(pf, "\tnode%u:x->node%u;\n", root, id);
+            n = n->next;
+        }
+    }
+}
+
+void genGraph(void)
+{
+    FILE *pf = NULL;
+    int i, j;
+    char temp[100] = {0};
+    node_t *p;
+
+    for (i=0; i<1<<16; i++)
+    {
+        if ((vrf[i].data.flag) || (vrf[i].data.x_flag))
+        {
+            p = &vrf[i];
+            sprintf(temp, "vrf_%u.dot", i);
+            pf = fopen(temp, "w");
+            if (pf)
+            {                
+                fprintf(pf, "digraph VRF_%u{\n\tnode[shape=record,height=.1];\n", i);
+                fprintf(pf, "\tnode%u[label=\"<e>%x|<x>%x\"];\n", id, p->data.flag, p->data.x_flag);
+                genGraphNode(pf, p);
+                fprintf(pf, "}");
+                fflush(pf);
+                fclose(pf);
+                pf = NULL;
+            }
+            sprintf(temp, "dot -Tpng vrf_%u.dot -o vrf_%u.png", i, i);
+            (void)system(temp);
+        }
+    }
 }
 
 void logAlloc(void)
@@ -510,6 +587,10 @@ int main(int argc, const char *argv[])
     allocate(num, type);
     search(type);
     logAlloc();
+
+    if ((argc > 3) && !(strcmp(argv[3], "-g")))
+        genGraph();
+    
     free(base);
     
     return 0;
