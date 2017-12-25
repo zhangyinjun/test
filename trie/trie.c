@@ -9,6 +9,7 @@
 /*  v4. use 15bits to store x_flag instead of 8bits which need  */
 /*     prefix expanding                                         */
 /*  v5. support graphing the trie by using "-g" para            */
+/*  v7. count the number of nodes for every level               */
 /****************************************************************/
 #include <stdlib.h>
 #include <stdio.h>
@@ -33,7 +34,8 @@ typedef struct node
     struct node *next;
     fields_t data;
     u32 index;
-    u64 reserve;
+    u32 level;
+    u32 reserve;
 }node_t;//size=32byte(64bit sys), assume need 64bits in hw
 
 typedef struct prio
@@ -60,7 +62,7 @@ typedef enum
     etype_max
 }ruletype_e;
 
-#define MAX_RULE_NUM    8*1024*1024
+#define MAX_RULE_NUM    16*1024*1024
 #define MAX_LEVEL       32
 #define BITS_PER_BYTE   8
 
@@ -183,7 +185,6 @@ void allocate(u32 num, ruletype_e type)
                     while (j--)
                         n = n->next;
                 }
-                p->reserve = 1;//indicate the last level;
                 n->data = rule_a[i].prio;
             }
             else
@@ -198,6 +199,7 @@ void allocate(u32 num, ruletype_e type)
                     node_t *t = NULL;
                     
                     ALLOC_NODE(t, i);
+                    t->level = k + 1;
                     if (!j)
                     {
                         p->data.addr = t->index;
@@ -279,12 +281,13 @@ done:
     return;
 }
 
-void genGraphNode(FILE *pf, node_t *r)
+void genGraphNode(FILE *pf, node_t *r, ruletype_e type)
 {
     int j;
     u32 root = id;
+    u8 level[etype_max] = {7, 7, 31, 31};
 
-    if (r->reserve == 1)
+    if (r->level == level[type])
     {
         prio_t *n = (prio_t *)(base + SPACE - r->data.addr * sizeof(prio_t));
 
@@ -305,7 +308,7 @@ void genGraphNode(FILE *pf, node_t *r)
             id++;
             fprintf(pf, "\tnode%u[label=\"<e>%x|<x>%x\"];\n", id, n->data.flag, n->data.x_flag);
             fprintf(pf, "\tnode%u:e->node%u;\n", root, id);
-            genGraphNode(pf, n);
+            genGraphNode(pf, n, type);
             n = n->next;
         }
     }
@@ -323,7 +326,7 @@ void genGraphNode(FILE *pf, node_t *r)
     }
 }
 
-void genGraph(void)
+void genGraph(ruletype_e type)
 {
     FILE *pf = NULL;
     int i, j;
@@ -341,7 +344,7 @@ void genGraph(void)
             {                
                 fprintf(pf, "digraph VRF_%u{\n\tnode[shape=record,height=.1];\n", i);
                 fprintf(pf, "\tnode%u[label=\"<e>%x|<x>%x\"];\n", id, p->data.flag, p->data.x_flag);
-                genGraphNode(pf, p);
+                genGraphNode(pf, p, type);
                 fprintf(pf, "}");
                 fflush(pf);
                 fclose(pf);
@@ -355,33 +358,22 @@ void genGraph(void)
 
 void logAlloc(void)
 {
-    /*
-    FILE *pf = NULL;
     int i;
-    
-    pf = fopen("level_graph.txt", "w");
-    if (pf)
-    {
-        for (i=0; i<MAX_LEVEL; i++)
-        {
-            node_t *p = head[i].next;
-            node_t *n = NULL;
+    u32 level[32] = {0};
+    node_t *p = NULL;
 
-            fprintf(pf, "level[%02d]\n", i);
-            while (p)
-            {
-                fprintf(pf, "{%x,{%x,%x,%x,%x,%x}}\n", p->u.index, p->data.addr, 
-                     p->data.x_addr, p->data.flag, p->data.x_flag, p->data.x_prio);
-                n = p->next;
-                FREE_NODE(p);
-                p = n;
-            }
-        }
-        fprintf(pf, "\ntotal %u nodes.\n", node_id);
-        fflush(pf);
-        fclose(pf);
+    for (i=0; i<node_id; i++)
+    {
+        p = (node_t *)(base + i * sizeof(node_t));
+        level[p->level]++;
     }
-    */
+    for (i=0; i<1<<16; i++)
+        if ((vrf[i].data.flag) || (vrf[i].data.x_flag))
+            level[0]++;
+        
+    for (i=0; i<32; i++)
+        printf("level%02d:%u\n", i, level[i]);
+    
     printf("total %u nodes.\n", node_id);
     printf("total %u prios.\n", prio_id);
 }
@@ -589,7 +581,7 @@ int main(int argc, const char *argv[])
     logAlloc();
 
     if ((argc > 3) && !(strcmp(argv[3], "-g")))
-        genGraph();
+        genGraph(type);
     
     free(base);
     
