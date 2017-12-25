@@ -4,6 +4,8 @@
 /*  v2. use 64K RAM(array) to store VRF instead of alloc node   */
 /*     dynamically when needed; Directly locate next node       */
 /*     instead of traversing the list                           */
+/*  v3. define new struct(32bits) to store prio instead of node */
+/*     struct(64bits)                                           */
 /****************************************************************/
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,6 +37,13 @@ typedef struct node
     } u;
 }node_t;
 
+typedef struct prio
+{
+    struct prio *next;
+    u32 data;
+    u32 index;
+}prio_t;
+
 typedef struct rule
 {
     u16 vrf;
@@ -57,6 +66,7 @@ typedef enum
 #define BITS_PER_BYTE   8
 
 u32 node_id = 0;
+u32 prio_id = 0;
 #if 0
 #define ALLOC_NODE(p)                                   \
     do {                                                \
@@ -72,10 +82,10 @@ u32 node_id = 0;
 #define FREE_NODE(p)    free((p))
 #else
 char *base = NULL;
-#define SPACE   256*1024*1024
+#define SPACE   128*1024*1024
 #define ALLOC_NODE(p, i)   \
     do {    \
-        if (node_id * sizeof(node_t) >= SPACE)   \
+        if ((node_id * sizeof(node_t) + prio_id * sizeof(prio_t)) >= SPACE)   \
         {   \
             printf("ALLOC_NODE(%u) for rule(%u) fail!\n", node_id, i);  \
             goto done;  \
@@ -84,7 +94,17 @@ char *base = NULL;
         (p)->u.index = node_id++;  \
     } while(0)
 
-#define FREE_NODE(p)
+#define ALLOC_PRIO(p, i)    \
+    do {    \
+        if ((node_id * sizeof(node_t) + prio_id * sizeof(prio_t)) >= SPACE)   \
+        {   \
+            printf("ALLOC_PRIO(%u) for rule(%u) fail!\n", prio_id, i);  \
+            goto done;  \
+        }   \
+        prio_id++;  \
+        (p) = (prio_t *)(base + SPACE - prio_id * sizeof(prio_t));    \
+        (p)->index = prio_id;  \
+    } while(0)
 #endif
 
 rule_t rule_a[MAX_RULE_NUM];
@@ -127,45 +147,81 @@ void allocate(u32 num, ruletype_e type)
         while (k < stepNum)
         {        
             u8 stepData = (rule_a[i].data[k>>3] >> ((k & 0x7) << 2)) & 0xf;
-            node_t *n = NULL;
             int j = countBits(p->data.flag, stepData);
             
-            if (p->data.flag)
-                n = (node_t *)(base + p->data.addr * sizeof(node_t));
-
-            if (!(p->data.flag & (1<<stepData)))
+            if ((k+1) == stepMax)
             {
-                node_t *t = NULL;
+                prio_t *n = NULL;
                 
-                ALLOC_NODE(t, i);
-                if (!j)
+                if (p->data.flag)
+                    n = (prio_t *)(base + SPACE - p->data.addr * sizeof(prio_t));
+                
+                if (!(p->data.flag & (1<<stepData)))
                 {
-                    p->data.addr = t->u.index;
-                    t->next = n;
+                    prio_t *t = NULL;
+                    
+                    ALLOC_PRIO(t, i);
+                    if (!j)
+                    {
+                        p->data.addr = t->index;
+                        t->next = n;
+                    }
+                    else
+                    {
+                        j--;
+                        while (j--)
+                            n = n->next;
+                        
+                        t->next = n->next;
+                        n->next = t;
+                    }
+                    n = t;
+                    p->data.flag |= 1<<stepData;
                 }
                 else
                 {
-                    j--;
                     while (j--)
                         n = n->next;
-                    
-                    t->next = n->next;
-                    n->next = t;
                 }
-                n = t;
-                p->data.flag |= 1<<stepData;
+                n->data = rule_a[i].prio;
             }
             else
             {
-                while (j--)
-                    n = n->next;
+                node_t *n = NULL;
+                
+                if (p->data.flag)
+                    n = (node_t *)(base + p->data.addr * sizeof(node_t));
+                
+                if (!(p->data.flag & (1<<stepData)))
+                {
+                    node_t *t = NULL;
+                    
+                    ALLOC_NODE(t, i);
+                    if (!j)
+                    {
+                        p->data.addr = t->u.index;
+                        t->next = n;
+                    }
+                    else
+                    {
+                        j--;
+                        while (j--)
+                            n = n->next;
+                        
+                        t->next = n->next;
+                        n->next = t;
+                    }
+                    n = t;
+                    p->data.flag |= 1<<stepData;
+                }
+                else
+                {
+                    while (j--)
+                        n = n->next;
+                }
+                p = n;
             }
-            p = n;
             k++;
-            if (k == stepMax)
-            {
-                p->data.addr = rule_a[i].prio;
-            }
         }
 
         if (stepNum < stepMax)//process x
@@ -174,12 +230,12 @@ void allocate(u32 num, ruletype_e type)
             u8 mask = (0xf << bitRemain) & 0xf;
             u8 j;
             u8 new_flag = 0, new_prio = bitRemain;
-            node_t *n = NULL;
-            node_t *t = NULL, *o = NULL;
+            prio_t *n = NULL;
+            prio_t *t = NULL, *o = NULL;
             u32 prioAddr = 0;
 
             if (p->data.x_flag)
-                n = (node_t *)(base + p->data.x_addr * sizeof(node_t));
+                n = (prio_t *)(base + SPACE - p->data.x_addr * sizeof(prio_t));
 
             o = n;
 
@@ -198,7 +254,7 @@ void allocate(u32 num, ruletype_e type)
                     
                     if ((new_flag & (1<<j)) && (((p->data.x_prio >> (j<<1)) & 0x3) < new_prio))
                     {
-                        n->data.addr = rule_a[i].prio;
+                        n->data = rule_a[i].prio;
                         p->data.x_prio &= ~(0x3 << (j<<1));
                         p->data.x_prio |= new_prio << (j<<1);
                     }
@@ -207,13 +263,13 @@ void allocate(u32 num, ruletype_e type)
                 }
                 else if (new_flag & (1<<j))
                 {
-                    ALLOC_NODE(t, i);
+                    ALLOC_PRIO(t, i);
                     if (!prioAddr)
-                        prioAddr = t->u.index;
+                        prioAddr = t->index;
                     else
                         o->next = t;
 
-                    t->data.addr = rule_a[i].prio;
+                    t->data = rule_a[i].prio;
                     t->next = n;                    
                     p->data.x_prio |= new_prio << (j<<1);
                     o = t;
@@ -258,6 +314,7 @@ void logAlloc(void)
     }
     */
     printf("total %u nodes.\n", node_id);
+    printf("total %u prios.\n", prio_id);
 }
 
 void parseRule(rule_t *rule, char *buf, ruletype_e type)
@@ -346,7 +403,7 @@ void search(ruletype_e type)
         u8 data = 0;
         u8 match = 0;
         u32 prio = 0;
-        node_t *n = NULL, *p = NULL;
+        node_t *n = NULL;
         
         printf("Please input search key: ");
         scanf("%s", buf);
@@ -383,30 +440,41 @@ void search(ruletype_e type)
                 {
                     if ((1<<(data&0x7)) & (n->data.x_flag))
                     {
+                        prio_t *p = NULL;
+                        
                         j = countBits(n->data.x_flag, data & 0x7);
-                        p = (node_t *)(base + n->data.x_addr * sizeof(node_t));
+                        p = (prio_t *)(base + SPACE - n->data.x_addr * sizeof(prio_t));
 
                         while (j--)
                             p = p->next;
 
-                        prio = p->data.addr;
+                        prio = p->data;
                         match = 1;
                     }
                     
                     if ((1<<data) & (n->data.flag))
                     {
                         j = countBits(n->data.flag, data);
-                        p = (node_t *)(base + n->data.addr * sizeof(node_t));
-
-                        while (j--)
-                            p = p->next;
 
                         if ((i+1)==len[type])
                         {
-                            prio = p->data.addr;
+                            prio_t *p = (prio_t *)(base + SPACE - n->data.addr * sizeof(prio_t));
+
+                            while (j--)
+                                p = p->next;
+                            
+                            prio = p->data;
                             match = 1;
                         }
-                        n = p;
+                        else
+                        {
+                            node_t *p = (node_t *)(base + n->data.addr * sizeof(node_t));
+
+                            while (j--)
+                                p = p->next;
+                            
+                            n = p;
+                        }
                     }
                     else
                         n = NULL;
