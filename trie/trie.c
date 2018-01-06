@@ -540,7 +540,7 @@ void genGraphNode(FILE *pf, node_t *r, ruletype_e type)
             if (n->u.data.x_flag & (1<<15))
             {
                 id++;
-                fprintf(pf, "\tnode%u[label=\"%02x%02x%02x%02x%02x%02x|%x\"];\n", id,
+                fprintf(pf, "\tnode%u[label=\"B|%02x%02x%02x%02x%02x%02x|%x\"];\n", id,
                 n->u.data2.val[5], n->u.data2.val[4], n->u.data2.val[3],
                 n->u.data2.val[2], n->u.data2.val[1], n->u.data2.val[0],
                 n->u.data2.x_flag & 0x7fff);
@@ -550,7 +550,7 @@ void genGraphNode(FILE *pf, node_t *r, ruletype_e type)
             else
             {
                 id++;
-                fprintf(pf, "\tnode%u[label=\"<e>%x|<x>%x\"];\n", id, n->u.data.flag, n->u.data.x_flag);
+                fprintf(pf, "\tnode%u[label=\"A|<e>%x|<x>%x\"];\n", id, n->u.data.flag, n->u.data.x_flag);
                 fprintf(pf, "\tnode%u->node%u;\n", root, id);
                 genGraphNode(pf, n, type);
             }
@@ -579,7 +579,7 @@ void genGraphNode(FILE *pf, node_t *r, ruletype_e type)
                 id++;
                 if (n->u.data.x_flag & (1<<15))
                 {
-                    fprintf(pf, "\tnode%u[label=\"%02x%02x%02x%02x%02x%02x|%x\"];\n", id,
+                    fprintf(pf, "\tnode%u[label=\"B|%02x%02x%02x%02x%02x%02x|%x\"];\n", id,
                     n->u.data2.val[5], n->u.data2.val[4], n->u.data2.val[3],
                     n->u.data2.val[2], n->u.data2.val[1], n->u.data2.val[0],
                     n->u.data2.x_flag & 0x7fff);
@@ -587,7 +587,7 @@ void genGraphNode(FILE *pf, node_t *r, ruletype_e type)
                 }
                 else
                 {
-                    fprintf(pf, "\tnode%u[label=\"<e>%x|<x>%x\"];\n", id, n->u.data.flag, n->u.data.x_flag);
+                    fprintf(pf, "\tnode%u[label=\"A|<e>%x|<x>%x\"];\n", id, n->u.data.flag, n->u.data.x_flag);
                     fprintf(pf, "\tnode%u:e->node%u;\n", root, id);
                 }
                 genGraphNode(pf, n, type);
@@ -627,12 +627,12 @@ void genGraph(ruletype_e type)
             {                
                 fprintf(pf, "digraph VRF_%u{\n\tnode[shape=record,height=.1];\n", i);
                 if (p->u.data.x_flag & (1<<15))
-                    fprintf(pf, "\tnode%u[label=\"%02x%02x%02x%02x%02x%02x|%x\"];\n", id,
+                    fprintf(pf, "\tnode%u[label=\"B|%02x%02x%02x%02x%02x%02x|%x\"];\n", id,
                     p->u.data2.val[5], p->u.data2.val[4], p->u.data2.val[3],
                     p->u.data2.val[2], p->u.data2.val[1], p->u.data2.val[0],
                     p->u.data2.x_flag & 0x7fff);
                 else
-                    fprintf(pf, "\tnode%u[label=\"<e>%x|<x>%x\"];\n", id, p->u.data.flag, p->u.data.x_flag);
+                    fprintf(pf, "\tnode%u[label=\"A|<e>%x|<x>%x\"];\n", id, p->u.data.flag, p->u.data.x_flag);
 
                 genGraphNode(pf, p, type);
                 fprintf(pf, "}");
