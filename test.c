@@ -41,7 +41,7 @@ int testcase2(void)
 
 int testcase3(void)
 {
-    printf("sizeof pointer: %u, sizeof long: %u, size of ull: %u\r\n", sizeof(char *), sizeof(unsigned long), sizeof(unsigned long long));
+    printf("sizeof int: %u, sizeof long: %u, size of ull: %u\r\n", sizeof(int), sizeof(unsigned long), sizeof(unsigned long long));
     return 0;
 }
 
