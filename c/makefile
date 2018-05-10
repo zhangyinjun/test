@@ -8,7 +8,9 @@ target=test
 
 all:$(target)
 
-%:%.o
+include $(target).d
+
+$(target):$(target).o
 	gcc -o $@ $<
 
 %.o:%.c
@@ -20,5 +22,4 @@ all:$(target)
 clean:
 	rm -rf $(target) *.o *.d
 
-include $(target).d
 

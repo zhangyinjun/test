@@ -8,6 +8,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <time.h>
+#include <sys/wait.h>
 
 int testcase1(void)
 {
@@ -39,10 +41,11 @@ int testcase2(void)
     return 0;
 }
 
+int g_test = 90;
 int testcase3(void)
 {
-    printf("sizeof int: %u, sizeof long: %u, size of ull: %u\r\n", sizeof(int), sizeof(unsigned long), sizeof(unsigned long long));
-    return 0;
+    printf("sizeof int: %u, sizeof long: %u, size of ull: %u, g_test: %d\r\n", sizeof(int), sizeof(unsigned long), sizeof(unsigned long long), g_test);
+    return -5;
 }
 
 int testcase4(void)
@@ -59,10 +62,12 @@ int testcase4(void)
 
 #define TEST_STRING	"hello"
 #define TEST_STRING_1	"world"
+#define NAME(ID)	"file_"#ID
 int testcase5(void)
 {
-    printf(TEST_STRING " zhangyinjun\r\n");
+    printf(TEST_STRING" zhangyinjun\r\n");
     printf(TEST_STRING TEST_STRING_1"\r\n");
+    printf(NAME(100)"\n");
     return 0;
 }
 
@@ -173,7 +178,127 @@ int testcase6(void)
     return 0;
 }
 
+int testcase7(void)//heap sort
+{
+    int arr[10] = {0};
+    int i = 0;
+    int temp;
+    int j = 0;
+
+    srand(time(0));
+    for (j=0; j<10; j++)
+    {
+        arr[j] = rand() % 100;
+        i = j;
+        while ((i>0) && (arr[i]<arr[(i-1)/2]))
+        {
+            temp = arr[i];
+            arr[i] = arr[(i-1)/2];
+            arr[(i-1)/2] = temp;
+            i = (i - 1) / 2;
+        }
+    }
+
+    for (j=9; j>0; j--)
+    {
+        temp = arr[0];
+        arr[0] = arr[j];
+        arr[j] = temp;
+
+        i = 0;
+        while ((i*2+1)<j)
+        {
+            int k = i * 2 + 1;
+
+            if ((k+1<j) && (arr[k+1] < arr[k])) k++;
+            if (arr[k] < arr[i])
+            {
+                temp = arr[k];
+                arr[k] = arr[i];
+                arr[i] = temp;
+            }
+            i = k;
+        }
+    }
+
+    for (i=0; i<10; i++)
+        printf("%d ", arr[i]);
+
+    printf("\n");
+}
+
+#define MAX_PHASE_NUM 200 
+#define MAX_DAC_NUM 200
+typedef struct
+{
+   int err[MAX_DAC_NUM];
+   int bits[MAX_DAC_NUM]; 
+} data_s;
+
+int testcase8(char *fn_in)
+{
+    FILE *fp_in = NULL;
+    data_s *pData = NULL;
+    char line[100] = {0};
+    int i, j;
+    int phase_cnt = 0, dac_cnt = 0;
+
+    pData = (data_s *)malloc(MAX_PHASE_NUM * sizeof(data_s));
+    if (!pData) goto done;
+
+    memset(pData, 0, MAX_PHASE_NUM * sizeof(data_s));
+
+    fp_in = fopen(fn_in, "r");    
+    if (!fp_in) {printf("open %s fail.\n", fn_in); goto done;}
+
+    while (fgets(line, sizeof(line), fp_in))
+    {
+        int phase_id = 0, dac_id = 0, err = 0, bits = 0;
+
+        if ((line[0] == '#') || (line[0] == '\n')) continue;
+        sscanf(line, "%3d,%4d,%7d,%14d", &phase_id, &dac_id, &err, &bits);
+        if ((phase_id < MAX_PHASE_NUM) && (dac_id < MAX_DAC_NUM))
+        {
+            pData[phase_id].err[dac_id] = err;
+            pData[phase_id].bits[dac_id] = bits;
+            if (dac_id > dac_cnt) dac_cnt = dac_id;
+            if (phase_id > phase_cnt) phase_cnt = phase_id;
+        }
+        //printf("%d,%d\n", pData[phase_id].err[dac_id], pData[phase_id].bits[dac_id]);
+    }
+
+    printf("eye diagram %d x %d:\n", phase_cnt+1, dac_cnt+1);
+    for (i = dac_cnt; i >= 0; i--)
+    {
+        printf("%4d:", i-dac_cnt/2);
+        for (j = 0; j <= phase_cnt; j++) 
+        {
+            char c;
+            int val = pData[j].err[i];
+
+            if (val <= 0) c = ' ';
+            else if (val < 30) c = '*';
+            else 
+            {
+                if (j == phase_cnt/2) c = '|';
+                else if (i == dac_cnt/2) c = '=';
+                else c = '#';
+            }
+            printf("%c", c);
+        }
+        printf("\n");
+    }
+
+done:
+    if (pData) free(pData);
+    if (fp_in) fclose(fp_in);
+    return 0;
+}
+
 int main(int argc, const char *argv[])
 {
-    return testcase3();
+    //char *fn = "data1.log";
+    //if (argc > 1) fn = argv[1];
+    //return testcase8(fn);
+    return testcase5();
 }

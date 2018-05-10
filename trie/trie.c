@@ -169,7 +169,7 @@ void allocate(u32 ruleNum, ruletype_e type)
             {
                 u8 num = p->u.data2.x_flag & 0x7fff;
 
-                assert((num>0) && (num<=12));
+                assert((num>0) && (num<=10));
 
                 if (seq < num)
                 {
@@ -294,7 +294,7 @@ void allocate(u32 ruleNum, ruletype_e type)
                         p->u.data2.addr = t->index;
                         t->data = rule_a[i].prio;
                     }
-                    else if (12 == seq)
+                    else if (10 == seq)
                     {
                         node_t *t = NULL;
 
