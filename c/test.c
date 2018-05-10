@@ -63,11 +63,14 @@ int testcase4(void)
 #define TEST_STRING	"hello"
 #define TEST_STRING_1	"world"
 #define NAME(ID)	"file_"#ID
+#define NAME2(ID)	file_##ID
 int testcase5(void)
 {
+	char *file_0 = "abc.c", *file_1 = "def.c";
     printf(TEST_STRING" zhangyinjun\r\n");
     printf(TEST_STRING TEST_STRING_1"\r\n");
     printf(NAME(100)"\n");
+	printf("%s\n", NAME2(1));
     return 0;
 }
 
