@@ -66,7 +66,7 @@ int testcase4(void)
 #define NAME2(ID)	file_##ID
 int testcase5(void)
 {
-	char *file_0 = "abc.c", *file_1 = "def.c";
+    char *file_0 = "abc.c", *file_1 = "def.c";
     printf(TEST_STRING" zhangyinjun\r\n");
     printf(TEST_STRING TEST_STRING_1"\r\n");
     printf(NAME(100)"\n");
