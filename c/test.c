@@ -10,6 +10,16 @@
 #include <signal.h>
 #include <time.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <linux/if_ether.h>
+#include <linux/if_packet.h>
+
+typedef struct{
+    int a:24;
+    int b:1;
+    int c:1;
+    int d:6;
+} BITSTR; 
 
 int testcase1(void)
 {
@@ -36,8 +46,11 @@ int testcase2(void)
     unsigned int *pa = &a;
     unsigned char *pb = (unsigned char *)&a;
     unsigned char b = *pb;
+    BITSTR s = {.a=0xabcdef,.b=1,.c=0,.d=0x12};
 
     printf("%#x %#x\n", *pa, b);
+    memcpy(&a, &s, sizeof(unsigned int));
+    printf("%#x\n", *pa);
     return 0;
 }
 
@@ -67,14 +80,19 @@ int testcase4(void)
 int testcase5(void)
 {
 	char *file_0 = "abc.c", *file_1 = "def.c";
+    char d = -1;
+    unsigned char e = -1;
     printf(TEST_STRING" zhangyinjun\r\n");
     printf(TEST_STRING TEST_STRING_1"\r\n");
     printf(NAME(100)"\n");
 	printf("%s\n", NAME2(1));
+    printf("%2x%2x%2x%2x\n", 1, 0x20, 0x100, 0x200);
+    printf("%d %d\n", d, e);
+    if (d == 255) printf("wwww\n");
     return 0;
 }
 
-#define BUFFER_SIZE	128
+#define BUFFER_SIZE	1024
 #define PORT		8888
 void handler(int signo)
 {
@@ -298,10 +316,49 @@ done:
     return 0;
 }
 
+int testcase9(void)
+{
+    char buf[BUFFER_SIZE] = {0};
+    struct sockaddr_in sockaddr = {0};
+    struct sockaddr_ll listenaddr = {0};
+    int i, len, addr_len;
+    int sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_IP));
+
+    if (sock < 0)
+    {
+        perror("create sock fail");
+        return -1;
+    }
+    listenaddr.sll_family = PF_PACKET;
+    listenaddr.sll_ifindex = 2;
+    listenaddr.sll_protocol = htons(ETH_P_IP);
+    if (bind(sock, (struct sockaddr *)&listenaddr, sizeof(listenaddr)) < 0)
+    {
+        perror("bind fail");
+        close(sock);
+        return -1;
+    }
+
+    while (1)
+    {
+        addr_len = sizeof(listenaddr);
+        len = recvfrom(sock, buf, BUFFER_SIZE, 0, (struct sockaddr *)&listenaddr, &addr_len);
+        //printf("receive packet from %s, len %d:\n", inet_ntoa(sockaddr.sin_addr), len);
+        printf("%u, %04x, %d, %u, %u, %u\n", listenaddr.sll_family, ntohs(listenaddr.sll_protocol),
+            listenaddr.sll_ifindex, listenaddr.sll_hatype, listenaddr.sll_pkttype, listenaddr.sll_halen);
+        for (i=0; i<len; i++) printf("%02x ", (unsigned char)buf[i]);
+        printf("\n");
+    }
+
+    close(sock);
+    return 0;
+}
+
+
 int main(int argc, const char *argv[])
 {
     //char *fn = "data1.log";
     //if (argc > 1) fn = argv[1];
     //return testcase8(fn);
-    return testcase5();
+    return testcase9();
 }

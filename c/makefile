@@ -9,12 +9,13 @@ target=test
 all:$(target)
 
 include $(target).d
+CFLAGS += -g
 
 $(target):$(target).o
-	gcc -o $@ $<
+	gcc $(CFLAGS) -o $@ $<
 
 %.o:%.c
-	gcc -o $@ -c $< 
+	gcc $(CFLAGS) -o $@ -c $< 
 
 %.d:%.c
 	gcc -MM $< > $@
