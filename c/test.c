@@ -360,5 +360,5 @@ int main(int argc, const char *argv[])
     //char *fn = "data1.log";
     //if (argc > 1) fn = argv[1];
     //return testcase8(fn);
-    return testcase9();
+    return testcase5();
 }
