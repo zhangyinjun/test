@@ -4,7 +4,7 @@
 #define ULONG unsigned long 
 #define UCHAR unsigned char
 #define USHORT unsigned short
-
+#define ULLONG unsigned long long
 
 typedef struct
 {
