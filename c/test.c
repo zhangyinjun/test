@@ -35,7 +35,7 @@ int testcase1(void)
 
     printf("st0:{%d,%d,%s}\n", st0.a, st0.b, st0.p);
     printf("st1:{%d,%d,%s}\n", st1.a, st1.b, st1.p);
-    printf("st2:{%d,%d,%s}\n", st2.a, st2.b, st2.p);
+   // printf("st2:{%d,%d,%s}\n", st2.a, st2.b, st2.p);
     printf("size:%d\n", sizeof(ST_TEST));
     return 0;
 }
