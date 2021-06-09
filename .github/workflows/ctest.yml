@@ -13,7 +13,7 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
     - run: |
-        for commits in "${{ steps.get-pr-commits.outputs.commits }}"; do
+        for commits in $(echo "${{ steps.get-pr-commits.outputs.commits }}" | jq ".[].sha"); do
           echo "$commits"
           git log $commits
         done
