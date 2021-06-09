@@ -1,0 +1,19 @@
+name: get commits action
+
+on: [pull_request]
+
+jobs:
+  commits_check_job:
+    runs-on: ubuntu-latest
+    name: Commits Check
+    steps:
+    - name: Get PR Commits
+      id: 'get-pr-commits'
+      uses: tim-actions/get-pr-commits@master
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    - run: |
+        for commits in "${{ steps.get-pr-commits.outputs.commits }}"; do
+          echo "$commits"
+          git log $commits
+        done
