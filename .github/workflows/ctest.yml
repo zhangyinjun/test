@@ -7,14 +7,16 @@ jobs:
     runs-on: ubuntu-latest
     name: Commits Check
     steps:
-    - name: Get PR Commits
-      id: 'get-pr-commits'
-      uses: tim-actions/get-pr-commits@master
+    - name: Get PR info
+      id: 'get-pr-info'
+      uses: Brymastr/pr-info-action@v1
+      
+    - name: Check out repository
+      uses: actions/checkout@v2
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-    - run: |
-        echo "${{ steps.get-pr-commits.outputs.commits }}" > tmpfile_commit
-        for commits in `cat tmpfile_commit | jq ".[].sha"`; do
-          echo "$commits"
-        done
-        rm -f tmpfile_commit
+        ref: ${{ steps.get-pr-info.head_branch }}
+        fetch-depth: ${{ steps.get-pr-info.head_branch }}
+        
+    - name: Get Commit Log
+      run: |
+        git log
