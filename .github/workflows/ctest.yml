@@ -15,9 +15,9 @@ jobs:
       uses: actions/checkout@v2
       with:
         ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: ${{ steps.get-pr-info.commits }}
+        fetch-depth: $((${{ steps.get-pr-info.outputs.commits }} + 1))
         
     - name: Get Commit Log
       run: |
-        echo ${{ steps.get-pr-info.commits }}
+        echo $((${{ steps.get-pr-info.outputs.commits }} + 1))
         git log -p | head -n 100
