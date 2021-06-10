@@ -4,11 +4,11 @@ on: [workflow_dispatch]
 
 jobs:
   commits_check_job:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     name: test action
     steps:
     - name: search coccinelle
       run: |
         uname -a
         cat /etc/lsb-release
-        sudo apt-get search coccinelle
+        apt search coccinelle
