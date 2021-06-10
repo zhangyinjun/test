@@ -1,0 +1,30 @@
+name: get commits action
+
+on: [pull_request]
+
+jobs:
+  commits_check_job:
+    runs-on: ubuntu-latest
+    name: Commits Check
+    steps:
+    - name: Get PR info
+      id: 'get-pr-info'
+      uses: Brymastr/pr-info-action@v1
+      
+    - name: Set Env Var
+      run: |
+        COMMIT_NUM=$((${{ steps.get-pr-info.outputs.commits }}+1))
+        echo "COMMIT_NUM=${COMMIT_NUM}"
+        echo "COMMIT_NUM=${COMMIT_NUM}" >> $GITHUB_ENV
+      
+    - name: Check out repository
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: ${{ env.COMMIT_NUM }}
+        
+    - name: Get Commit Log
+      run: |
+        echo ${{ env.COMMIT_NUM }}
+        git log --oneline
+        git log -p | head -n 100
