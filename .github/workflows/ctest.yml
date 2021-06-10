@@ -14,9 +14,10 @@ jobs:
     - name: Check out repository
       uses: actions/checkout@v2
       with:
-        ref: ${{ steps.get-pr-info.head_branch }}
-        fetch-depth: ${{ steps.get-pr-info.head_branch }}
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: ${{ steps.get-pr-info.commits }}
         
     - name: Get Commit Log
       run: |
-        git log
+        echo ${{ steps.get-pr-info.commits }}
+        git log -p | head -n 100
