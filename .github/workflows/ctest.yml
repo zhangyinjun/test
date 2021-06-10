@@ -12,3 +12,4 @@ jobs:
         uname -a
         cat /etc/lsb-release
         apt search coccinelle
+        apt search gcc-10
