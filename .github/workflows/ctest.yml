@@ -8,4 +8,7 @@ jobs:
     name: test action
     steps:
     - name: search coccinelle
-      run: apt search coccinelle
+      run: |
+        uname -a
+        cat /etc/lsb-release
+        sudo apt-get search coccinelle
