@@ -15,4 +15,3 @@ typedef struct
 } ST_TEST;
 
 #endif
-
