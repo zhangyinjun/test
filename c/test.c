@@ -354,7 +354,6 @@ int testcase9(void)
     return 0;
 }
 
-
 int main(int argc, const char *argv[])
 {
     //char *fn = "data1.log";
