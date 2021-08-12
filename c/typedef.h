@@ -1,7 +1,6 @@
 #ifndef __TYPEDEF_H__
 #define __TYPEDEF_H__
 
-
 #define ULONG unsigned long 
 #define UCHAR unsigned char
 #define USHORT unsigned short
